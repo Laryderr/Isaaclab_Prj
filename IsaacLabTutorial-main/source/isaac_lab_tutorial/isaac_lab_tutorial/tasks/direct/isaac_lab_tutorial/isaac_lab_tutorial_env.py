@@ -150,7 +150,7 @@ class IsaacLabTutorialEnv(DirectRLEnv):
 
         # keepdim=True: 保持形状为 [num_envs, 1] 而不是 [num_envs]
         alignment_reward = torch.sum(self.forwards * self.commands, dim=-1, keepdim=True) #对齐奖励
-        total_reward = forward_reward + alignment_reward
+        total_reward = forward_reward * alignment_reward
         return total_reward
 
     # 标记哪些环境需要重置以及原因
