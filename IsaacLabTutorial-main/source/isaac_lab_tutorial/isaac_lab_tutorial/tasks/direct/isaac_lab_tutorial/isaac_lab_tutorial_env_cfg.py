@@ -15,7 +15,7 @@ class IsaacLabTutorialEnvCfg(DirectRLEnvCfg):
     #只有两个被驱动关节
     action_space = 2
     # 3是只包含线速度的观测
-    observation_space = 3
+    observation_space = 9
     state_space = 0
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 120, render_interval=decimation)

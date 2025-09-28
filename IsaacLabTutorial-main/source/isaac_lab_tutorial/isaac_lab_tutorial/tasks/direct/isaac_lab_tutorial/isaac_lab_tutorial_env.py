@@ -109,12 +109,44 @@ class IsaacLabTutorialEnv(DirectRLEnv):
 
     # root_com_lin_vel_b 是 ArticulationData 的一个属性，处理了质心线性速度从世界坐标系到本体坐标系的转换。
     def _get_observations(self) -> dict:
-        self.velocity = self.robot.data.root_com_lin_vel_b
-        observations = {"policy": self.velocity}
+        self.velocity = self.robot.data.root_com_vel_w #质心线速度，世界坐标系
+
+        # quat_apply(quaternion, vector) 的作用：将向量从一个坐标系旋转到另一个坐标系
+        # FORWARD_VEC_B = [1, 0, 0]  (本体坐标系中的前进方向)
+        # root_link_quat_w: 机器人相对于世界坐标系的旋转四元数
+        # 结果: 机器人在世界坐标系中的前进方向向量
+        self.forwards = math_utils.quat_apply(self.robot.data.root_link_quat_w, self.robot.data.FORWARD_VEC_B) 
+
+        obs = torch.hstack((self.velocity, self.commands))
+        observations = {"policy": obs}
         return observations
 
     def _get_rewards(self) -> torch.Tensor:
-        total_reward = torch.linalg.norm(self.velocity, dim=-1, keepdim=True)
+        # root_com_lin_vel_b: 本体坐标系下的线性速度
+        # 形状: [num_envs, 3] = [[vx, vy, vz], [vx, vy, vz], ...]
+
+        # [:,0] 取第0列（x方向速度）
+        # 形状: [num_envs] = [vx, vx, vx, ...]
+
+        # .reshape(-1,1) 转为列向量
+        # 形状: [num_envs, 1] = [[vx], [vx], [vx], ...]
+        forward_reward = self.robot.data.root_com_lin_vel_b[:,0].reshape(-1,1) #前进移动奖励
+        # 向量点积公式：A·B = |A||B|cos(θ)
+        # 当A和B都是单位向量时：A·B = cos(θ)
+        # θ是两向量间夹角
+
+        # self.forwards: [num_envs, 3]  机器人前进方向
+        # self.commands: [num_envs, 3]  期望命令方向
+
+        # 逐元素乘法：
+        # self.forwards * self.commands = [[fx*cx, fy*cy, fz*cz], ...]
+
+        # torch.sum(..., dim=-1): 沿最后维度求和
+        # 结果：[fx*cx + fy*cy + fz*cz, ...] = 点积结果
+
+        # keepdim=True: 保持形状为 [num_envs, 1] 而不是 [num_envs]
+        alignment_reward = torch.sum(self.forwards * self.commands, dim=-1, keepdim=True) #对齐奖励
+        total_reward = forward_reward + alignment_reward
         return total_reward
 
     # 标记哪些环境需要重置以及原因
