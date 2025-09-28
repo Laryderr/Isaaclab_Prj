@@ -117,7 +117,11 @@ class IsaacLabTutorialEnv(DirectRLEnv):
         # 结果: 机器人在世界坐标系中的前进方向向量
         self.forwards = math_utils.quat_apply(self.robot.data.root_link_quat_w, self.robot.data.FORWARD_VEC_B) 
 
-        obs = torch.hstack((self.velocity, self.commands))
+        dot = torch.sum(self.forwards * self.commands, dim=-1, keepdim=True)
+        cross = torch.cross(self.forwards, self.commands, dim=-1)[:,-1].reshape(-1,1)
+        forward_speed = self.robot.data.root_com_lin_vel_b[:,0].reshape(-1,1)
+        obs = torch.hstack((dot, cross, forward_speed))
+
         observations = {"policy": obs}
         return observations
 
